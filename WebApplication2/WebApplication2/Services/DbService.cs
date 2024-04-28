@@ -145,6 +145,7 @@ public class DbService(IConfiguration configuration) :IDbService
             ins.Parameters.AddWithValue("@6", DateTime.Now);
 
             var kluczgłowny = (int)(await ins.ExecuteScalarAsync())!;
+            await transaction.CommitAsync();
             productWarehouse.IdProductWarehouse = kluczgłowny;
             return productWarehouse;
         }catch (Exception)
