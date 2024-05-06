@@ -34,10 +34,10 @@ public class WarehouseController: ControllerBase
         
         if (!await _dbService.CzyNieZamowienieZrealizowane(productWarehouse.IdProduct,productWarehouse.Amount))
             return BadRequest($"Order in ProductWarehouse with given ID and Amount- {productWarehouse.IdProduct},{productWarehouse.Amount} already exists");
-
+        int result;
         await _dbService.AktulizacjaOrder(productWarehouse.IdProduct, productWarehouse.Amount);
-        await _dbService.AddProduct_Warehouse(productWarehouse);
-        return Created(Request.Path.Value ?? "api/Warehouse", productWarehouse);
+        result = await _dbService.AddProduct_Warehouse(productWarehouse);
+        return Ok($"Created ProductWarehouse with ID {result}");
 
     }
     
