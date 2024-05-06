@@ -1,5 +1,5 @@
 ﻿namespace WebApplication2.DTOs;
 
-public record CreateProduct_WarehouseDTOs(
+public record CreateProduct_WarehouseDTO(
     
     );

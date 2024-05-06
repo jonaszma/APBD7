@@ -5,14 +5,14 @@ using WebApplication2.Models;
 
 namespace WebApplication2.Services;
 
-public interface IDbService
-{
-    Task<Product_Warehouse> AddProduct_Warehouse(Product_Warehouse productWarehouse);
-}
-
 
 public class DbService(IConfiguration configuration) :IDbService
 {
+    private readonly IConfiguration _configuration;
+
+
+    
+
     private async Task<SqlConnection> GetConnection()
     {
         var connection = new SqlConnection(configuration.GetConnectionString("Default"));
@@ -26,110 +26,37 @@ public class DbService(IConfiguration configuration) :IDbService
 
     
     
+    
+    
 
-    public async Task<Product_Warehouse> AddProduct_Warehouse(Product_Warehouse productWarehouse)
+    public async Task<int> AddProduct_Warehouse(Product_Warehouse productWarehouse)
     {
         await using var connection = await GetConnection();
         await using var transaction = await connection.BeginTransactionAsync();
-
-        try
-        {
-
-
+        
+    
 
             var command = new SqlCommand(
-                @"select IdProduct, Price from Product where IdProduct = @1",
+                @"select IdOrder from Order where IdProduct = @1 and Amount =@2",
                 connection
             );
             command.Parameters.AddWithValue("@1", productWarehouse.IdProduct);
-            var reader1 = await command.ExecuteReaderAsync();
-
-            if (!reader1.HasRows)
-            {
-                return null;
-            }
-
-            var price2 = reader1.GetInt32(1);
-
-            var command1 = new SqlCommand(
-                @"select IdWarehouse from Warehouse where IdWarehouse = @1",
-                connection
-            );
-            command1.Parameters.AddWithValue("@1", productWarehouse.IdWarehouse);
-            var reader2 = await command1.ExecuteReaderAsync();
-
-            if (!reader2.HasRows)
-            {
-                return null;
-            }
-
-            if (productWarehouse.Amount > 0)
-            {
-
-            }
-            else return null;
-
-
+            command.Parameters.AddWithValue("@2", productWarehouse.Amount);
+            await connection.OpenAsync();
+            var reader = await command.ExecuteReaderAsync();
+            var idOrder = reader.GetInt32(0);
+            
             var command2 = new SqlCommand(
-                @"select CreatedAt, IdOrder from Order where IdProduct = @1 and Amount =@2",
-                connection
-            );
-            command2.Parameters.AddWithValue("@1", productWarehouse.IdProduct);
-            command2.Parameters.AddWithValue("@2", productWarehouse.Amount);
-            var reader3 = await command2.ExecuteReaderAsync();
-
-            if (!reader3.HasRows)
-            {
-                return null;
-            }
-
-            if (!await reader3.ReadAsync())
-            {
-                return null;
-            }
-
-            var idOrder = reader3.GetInt32(1);
-
-            var data = reader3.GetDateTime(0);
-            if (productWarehouse.CreateAt < data)
-            {
-                return null;
-            }
-
-            var command3 = new SqlCommand(
-                @"select * from Product_Warehouse where IdOrder = @1 ",
-                connection
-            );
-            command3.Parameters.AddWithValue("@1", productWarehouse.IdProduct);
-
-            var reader4 = await command3.ExecuteReaderAsync();
-
-            if (!reader4.HasRows)
-            {
-                return null;
-            }
-
-            var command4 = new SqlCommand(
-                @"UPDATE Order SET FulfilledAt=@2 where IdOrder=@1",
-                connection
-            );
-            command4.Parameters.AddWithValue("@1", productWarehouse.IdProduct);
-            command4.Parameters.AddWithValue("@2", DateTime.Now);
-
-            var command5 = new SqlCommand(
                 @"select Price from Product where IdProduct = @1 ",
                 connection
             );
-            command5.Parameters.AddWithValue("@1", productWarehouse.IdProduct);
-
-            var reader6 = await command5.ExecuteReaderAsync();
-
-            if (!await reader6.ReadAsync())
-            {
-                return null;
-            }
-
-            var price = reader6.GetDouble(0);
+            command2.Parameters.AddWithValue("@1", productWarehouse.IdProduct);
+            
+            await connection.OpenAsync();
+            var reader2 = await command.ExecuteReaderAsync();
+            var price = reader.GetInt32(0);
+            
+            
 
             var ins = new SqlCommand(
                 @"INSERT INTO Product_Warhouse values (@1,@2,@3,@4,@5,@6);
@@ -141,52 +68,143 @@ public class DbService(IConfiguration configuration) :IDbService
             ins.Parameters.AddWithValue("@1", productWarehouse.IdWarehouse);
             ins.Parameters.AddWithValue("@3", idOrder);
             ins.Parameters.AddWithValue("@4", productWarehouse.Amount);
-            ins.Parameters.AddWithValue("@5", price2 * productWarehouse.Amount);
+            ins.Parameters.AddWithValue("@5", price * productWarehouse.Amount);
             ins.Parameters.AddWithValue("@6", DateTime.Now);
 
-            var kluczgłowny = (int)(await ins.ExecuteScalarAsync())!;
-            await transaction.CommitAsync();
-            productWarehouse.IdProductWarehouse = kluczgłowny;
-            return productWarehouse;
-        }catch (Exception)
-        {
-            await transaction.RollbackAsync();
-            throw;
-        }
+            await connection.OpenAsync();
+            var id = await ins.ExecuteScalarAsync();
+            if (id is null) throw new Exception();
+            return Convert.ToInt32(id);
+
+        
     }
+
+    public async Task<bool> DoesProductExists(int id)
+    {
+        await using var connection = await GetConnection();
+        var command = new SqlCommand(
+            @"select IdProduct, Price from Product where IdProduct = @1",
+            connection
+        );
+        command.Parameters.AddWithValue("@1", id);
+        await connection.OpenAsync();
+        var reader = await command.ExecuteReaderAsync();
+
+        if (!reader.HasRows)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    public async Task<bool> DoesWarehouseExists(int id)
+    {
+        await using var connection = await GetConnection();
+        var command1 = new SqlCommand(
+            @"select IdWarehouse from Warehouse where IdWarehouse = @1",
+            connection
+        );
+        command1.Parameters.AddWithValue("@1", id);
+        await connection.OpenAsync();
+        var reader = await command1.ExecuteReaderAsync();
+
+        if (!reader.HasRows)
+        {
+            return false;
+        }
+        return true;
+    }
+
+    public async Task<bool> DoesOrderExistsAndWasCreatedBefore(int id, int amount,DateTime time)
+    {
+        await using var connection = await GetConnection();
+        var command = new SqlCommand(
+            @"select IdOrder, CreatedAt from Order where IdProduct = @1 and Amount =@2",
+            connection
+        );
+        command.Parameters.AddWithValue("@1", id);
+        command.Parameters.AddWithValue("@2", amount);
+        await connection.OpenAsync();
+        var reader = await command.ExecuteReaderAsync();
+        var data = reader.GetDateTime(1);
+        if (!reader.HasRows)
+        {
+            return false;
+        }
+        if (data>time)
+        {
+            return false;
+        }
+        
+        return true;
+    }
+
     
+
+    public async Task<bool> CzyNieZamowienieZrealizowane(int id,int amount)
+    {
+        await using var connection = await GetConnection();
+        
+        var command = new SqlCommand(
+            @"select * from Product_Warehouse  
+                        JOIN Order ON  Product_Warehouse.IdOrder = Order.IdOrder
+                                                where Order.IdProduct = @1 and Order.Amount=@2 ",
+            connection
+        );
+        command.Parameters.AddWithValue("@1", id);
+        command.Parameters.AddWithValue("@2", amount);
+        await connection.OpenAsync();
+        var reader4 = await command.ExecuteReaderAsync();
+
+        if (!reader4.HasRows)
+        {
+            return true;
+        }
+
+        return false;
+
+
+    }
+
+    public async Task AktulizacjaOrder(int id, int amount)
+    {
+        await using var connection = await GetConnection();
+        
+        var command = new SqlCommand(
+            @"UPDATE Order SET FulfilledAt=@2 where IdProduct = @1 and Amount =@3",
+            connection
+        );
+        command.Parameters.AddWithValue("@1", id);
+        command.Parameters.AddWithValue("@2", DateTime.Now);
+        command.Parameters.AddWithValue("@3", amount);
+        await connection.OpenAsync();
+        var reader4 = await command.ExecuteReaderAsync();
+        
+    }
+
+    public async Task<Double> GetPrice(int id)
+    {
+        await using var connection = await GetConnection();
+        
+        
+        var command = new SqlCommand(
+            @"select Price from Product where IdProduct = @1",
+            connection
+        );
+        command.Parameters.AddWithValue("@1", id);
+        await connection.OpenAsync();
+        var reader = await command.ExecuteReaderAsync();
+
+        await reader.ReadAsync();
+        var price = reader.GetDouble(0);
+
+        return price;
+        
+    }
+
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
+
     
 }
