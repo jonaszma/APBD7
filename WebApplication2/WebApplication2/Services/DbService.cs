@@ -55,7 +55,7 @@ public class DbService(IConfiguration configuration) :IDbService
             await connection.OpenAsync();
             var reader2 = await command.ExecuteReaderAsync();
             var price = reader.GetInt32(0);
-            
+
             try
             {
 
@@ -80,6 +80,7 @@ public class DbService(IConfiguration configuration) :IDbService
             catch (Exception)
             {
                 await transaction.RollbackAsync();
+                throw;
             }
 
     }
