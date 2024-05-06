@@ -56,27 +56,32 @@ public class DbService(IConfiguration configuration) :IDbService
             var reader2 = await command.ExecuteReaderAsync();
             var price = reader.GetInt32(0);
             
-            
+            try
+            {
 
-            var ins = new SqlCommand(
-                @"INSERT INTO Product_Warhouse values (@1,@2,@3,@4,@5,@6);
+                var ins = new SqlCommand(
+                    @"INSERT INTO Product_Warhouse values (@1,@2,@3,@4,@5,@6);
                             select cast(scope_indetity() as int)",
-                connection,
-                (SqlTransaction)transaction
-            );
-            ins.Parameters.AddWithValue("@2", productWarehouse.IdProduct);
-            ins.Parameters.AddWithValue("@1", productWarehouse.IdWarehouse);
-            ins.Parameters.AddWithValue("@3", idOrder);
-            ins.Parameters.AddWithValue("@4", productWarehouse.Amount);
-            ins.Parameters.AddWithValue("@5", price * productWarehouse.Amount);
-            ins.Parameters.AddWithValue("@6", DateTime.Now);
+                    connection,
+                    (SqlTransaction)transaction
+                );
+                ins.Parameters.AddWithValue("@2", productWarehouse.IdProduct);
+                ins.Parameters.AddWithValue("@1", productWarehouse.IdWarehouse);
+                ins.Parameters.AddWithValue("@3", idOrder);
+                ins.Parameters.AddWithValue("@4", productWarehouse.Amount);
+                ins.Parameters.AddWithValue("@5", price * productWarehouse.Amount);
+                ins.Parameters.AddWithValue("@6", DateTime.Now);
 
-            await connection.OpenAsync();
-            var id = await ins.ExecuteScalarAsync();
-            if (id is null) throw new Exception();
-            return Convert.ToInt32(id);
+                await connection.OpenAsync();
+                var id = await ins.ExecuteScalarAsync();
+                if (id is null) throw new Exception();
+                return Convert.ToInt32(id);
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync();
+            }
 
-        
     }
 
     public async Task<bool> DoesProductExists(int id)
